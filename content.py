@@ -10,7 +10,6 @@ from __future__ import division
 import numpy as np
 from scipy import spatial
 from scipy.sparse import csc_matrix
-from scipy.spatial import distance
 
 
 def hamming_distance(X, X_train):
@@ -22,23 +21,9 @@ def hamming_distance(X, X_train):
     zbioru zwrocone zostana w postaci macierzy
     :return: macierz odleglosci pomiedzy obiektami z X i X_train N1xN2
     """
-    return (spatial.distance.cdist(csc_matrix.toarray(X.astype(int)), csc_matrix.toarray(X_train.astype(int)), 'hamming')*X.shape[1]).astype(int)
+    return (spatial.distance.cdist(csc_matrix.toarray(X.astype(int)),
+                                   csc_matrix.toarray(X_train.astype(int)), 'hamming') * X.shape[1]).astype(int)
 
-def hammingss_distance(X, X_train):
-    """
-    :param X: zbior porownwanych obiektow N1xD
-    :param X_train: zbior obiektow do ktorych porownujemy N2xD
-    Funkcja wyznacza odleglosci Hamminga obiektow ze zbioru X od
-    obiektow X_train. ODleglosci obiektow z jednego i drugiego
-    zbioru zwrocone zostana w postaci macierzy
-    :return: macierz odleglosci pomiedzy obiektami z X i X_train N1xN2
-    """
-    iX = X.astype(int)
-    iX_train = X_train.astype(int)
-    notX = np.logical_not(csc_matrix.toarray(iX))
-    notXT = np.logical_not(csc_matrix.toarray(iX_train))
-    out = iX @ np.transpose(notXT)
-    return out
 
 def sort_train_labels_knn(Dist, y):
     """
@@ -68,25 +53,18 @@ def p_y_x_knn(y, k):
     :param k: liczba najblizszuch sasiadow dla KNN
     :return: macierz prawdopodobienstw dla obiektow z X
     """
+    return [[np.count_nonzero(np.array(yn[:k]) == i)/k for i in range(1, 5)] for yn in y]
 
-    res = [np.min([distance.hamming(row, yi) for yi in y]) for row in y]
-    for yn in y:
-        print(yn)
-    pass
-    # return res
-
-def pfun(y, k):
-    return np.vectorize(lambda yn: (yn == y).sum()/k)
 
 def classification_error(p_y_x, y_true):
     """
     Wyznacz blad klasyfikacji.
-    :param p_y_x: macierz przewidywanych prawdopodobienstw
-    :param y_true: zbior rzeczywistych etykiet klas 1xN.
+    :param p_y_x: macierz przewidywanych prawdopodobienstw <class 'numpy.ndarray'>
+    :param y_true: zbior rzeczywistych etykiet klas 1xN. <class 'numpy.ndarray'>
     Kazdy wiersz macierzy reprezentuje rozklad p(y|x)
     :return: blad klasyfikacji
     """
-    pass
+    return np.count_nonzero(y_true != np.array([len(p) - np.argmax(p[::-1]) for p in p_y_x])) / y_true.size
 
 
 def model_selection_knn(Xval, Xtrain, yval, ytrain, k_values):
@@ -99,7 +77,10 @@ def model_selection_knn(Xval, Xtrain, yval, ytrain, k_values):
     :return: funkcja wykonuje selekcje modelu knn i zwraca krotke (best_error,best_k,errors), gdzie best_error to najnizszy
     osiagniety blad, best_k - k dla ktorego blad byl najnizszy, errors - lista wartosci bledow dla kolejnych k z k_values
     """
-    pass
+    dist = hamming_distance(Xval, Xtrain)
+    sorted_labels = sort_train_labels_knn(dist, ytrain)
+    errors = [classification_error(p_y_x_knn(sorted_labels, k), yval) for k in k_values]
+    return min(errors), k_values[np.argmin(errors)], errors
 
 
 def estimate_a_priori_nb(ytrain):
@@ -107,7 +88,7 @@ def estimate_a_priori_nb(ytrain):
     :param ytrain: etykiety dla dla danych treningowych 1xN
     :return: funkcja wyznacza rozklad a priori p(y) i zwraca p_y - wektor prawdopodobienstw a priori 1xM
     """
-    pass
+    return [np.count_nonzero(np.array(ytrain) == k) / len(ytrain) for k in np.array(range(1, 5))]
 
 
 def estimate_p_x_y_nb(Xtrain, ytrain, a, b):
