@@ -100,7 +100,10 @@ def estimate_p_x_y_nb(Xtrain, ytrain, a, b):
     :return: funkcja wyznacza rozklad prawdopodobienstwa p(x|y) zakladajac, ze x przyjmuje wartosci binarne i ze elementy
     x sa niezalezne od siebie. Funkcja zwraca macierz p_x_y o wymiarach MxD.
     """
-    pass
+    xtrain = np.transpose(Xtrain.toarray())
+    N, D = xtrain.shape
+    return np.array([np.divide(np.add([np.sum(np.bitwise_and(xtrain[i], np.equal(ytrain, k))) for i in range(N)], a - 1),
+                      np.sum(np.array(ytrain) == k) + a + b - 2) for k in range(1, 5)])
 
 
 def p_y_x_nb(p_y, p_x_1_y, X):
@@ -111,7 +114,26 @@ def p_y_x_nb(p_y, p_x_1_y, X):
     :return: funkcja wyznacza rozklad prawdopodobienstwa p(y|x) dla kazdej z klas z wykorzystaniem klasyfikatora Naiwnego
     Bayesa. Funkcja zwraca macierz p_y_x o wymiarach NxM.
     """
-    pass
+    X = X.toarray()
+
+    def calc2(row, x2):
+        return np.multiply(row, x2)
+
+    def normalise(row):
+        Z = 1 / np.sum(row)
+        return np.multiply(row, Z)
+
+    def calc(row):
+        out = X * row
+        out += np.negative(X) - np.negative(X) * row
+        out = np.apply_along_axis(np.prod, arr=out, axis=1)
+        return out
+
+    test = np.apply_along_axis(calc, axis=0, arr=np.array(p_x_1_y).transpose())
+    test = np.apply_along_axis(calc2, axis=1, arr=test, x2=p_y)
+    test = np.apply_along_axis(normalise, axis=1, arr=test)
+
+    return test
 
 
 def model_selection_nb(Xtrain, Xval, ytrain, yval, a_values, b_values):
@@ -127,4 +149,29 @@ def model_selection_nb(Xtrain, Xval, ytrain, yval, a_values, b_values):
     osiagniety blad, best_a - a dla ktorego blad byl najnizszy, best_b - b dla ktorego blad byl najnizszy,
     errors - macierz wartosci bledow dla wszystkich par (a,b)
     """
+
+    bestErrorIndex = 0
+    alen = int(len(a_values))
+    blen = int(len(b_values))
+    errors = []
+
+    def test(index):
+        nonlocal bestErrorIndex
+        i = int(index / alen)
+        j = int(index % blen)
+
+        py = estimate_a_priori_nb(ytrain)
+        p_x_y = estimate_p_x_y_nb(Xtrain, ytrain, a_values[i], b_values[j])
+        p_y_x = p_y_x_nb(py, p_x_y, Xval)
+        error = classification_error(p_y_x, yval)
+        errors.append(error)
+
+        if (errors[bestErrorIndex] > error):
+            bestErrorIndex = index
+
+    xx = map(test, range(alen * blen))
+    xx = list(xx)
+
+    return (errors[bestErrorIndex], a_values[int(round(bestErrorIndex / len(b_values)))],
+            b_values[bestErrorIndex % len(b_values)], np.array(errors).reshape(len(a_values), len(b_values)))
     pass
