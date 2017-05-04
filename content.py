@@ -116,18 +116,18 @@ def p_y_x_nb(p_y, p_x_1_y, X):
     """
     X = X.toarray()
 
-    def calc(row):
-        out = X * row
-        out += np.negative(X) - np.negative(X) * row
-        out = np.apply_along_axis(np.prod, arr=out, axis=1)
-        return out
-
     def calc2(row, x2):
         return np.multiply(row, x2)
 
     def normalise(row):
         Z = 1 / np.sum(row)
         return np.multiply(row, Z)
+
+    def calc(row):
+        out = X * row
+        out += np.negative(X) - np.negative(X) * row
+        out = np.apply_along_axis(np.prod, arr=out, axis=1)
+        return out
 
     test = np.apply_along_axis(calc, axis=0, arr=np.array(p_x_1_y).transpose())
     test = np.apply_along_axis(calc2, axis=1, arr=test, x2=p_y)
@@ -149,8 +149,29 @@ def model_selection_nb(Xtrain, Xval, ytrain, yval, a_values, b_values):
     osiagniety blad, best_a - a dla ktorego blad byl najnizszy, best_b - b dla ktorego blad byl najnizszy,
     errors - macierz wartosci bledow dla wszystkich par (a,b)
     """
-    a_len, b_len = int(len(a_values)), int(len(b_values))
-    errors = np.array([classification_error(p_y_x_nb(estimate_a_priori_nb(ytrain), estimate_p_x_y_nb(Xtrain, ytrain,
-        a_values[int(i / a_len)], b_values[int(i % b_len)]), Xval), yval) for i in range(a_len * b_len)])
-    return (min(errors), a_values[int(round(np.argmin(errors) / len(b_values)))],
-            b_values[np.argmin(errors) % len(b_values)], np.array(errors).reshape(len(a_values), len(b_values)))
+
+    bestErrorIndex = 0
+    alen = int(len(a_values))
+    blen = int(len(b_values))
+    errors = []
+
+    def test(index):
+        nonlocal bestErrorIndex
+        i = int(index / alen)
+        j = int(index % blen)
+
+        py = estimate_a_priori_nb(ytrain)
+        p_x_y = estimate_p_x_y_nb(Xtrain, ytrain, a_values[i], b_values[j])
+        p_y_x = p_y_x_nb(py, p_x_y, Xval)
+        error = classification_error(p_y_x, yval)
+        errors.append(error)
+
+        if (errors[bestErrorIndex] > error):
+            bestErrorIndex = index
+
+    xx = map(test, range(alen * blen))
+    xx = list(xx)
+
+    return (errors[bestErrorIndex], a_values[int(round(bestErrorIndex / len(b_values)))],
+            b_values[bestErrorIndex % len(b_values)], np.array(errors).reshape(len(a_values), len(b_values)))
+    pass
